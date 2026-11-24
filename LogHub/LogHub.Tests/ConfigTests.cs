@@ -42,7 +42,7 @@ public class ConfigTests
         var key = Guid.NewGuid().ToString();
         AssertClassicValueIsAbsent(key);
         ClassicConfigService.Instance().SetValue(key, "present");
-        Assert.ThrowsException<AssertFailedException>(() => AssertClassicValueIsAbsent(key));
+        Assert.ThrowsExactly<AssertFailedException>(() => AssertClassicValueIsAbsent(key));
     }
     private static void AssertClassicValueIsAbsent(string key) =>
         Assert.IsNull(ClassicConfigService.Instance().GetValue(key));
@@ -66,3 +66,4 @@ public class ConfigTests
         Assert.IsNull(independent.GetValue("key"));
     }
 }
+
