@@ -37,9 +37,19 @@ public class ConfigTests
         Assert.AreEqual("written", ClassicConfigService.Instance().GetValue(key));
     }
     [TestMethod]
+    public void ClassicOrderDependenceIsReproduced()
+    {
+        var key = Guid.NewGuid().ToString();
+        AssertClassicValueIsAbsent(key);
+        ClassicConfigService.Instance().SetValue(key, "present");
+        Assert.ThrowsException<AssertFailedException>(() => AssertClassicValueIsAbsent(key));
+    }
+    private static void AssertClassicValueIsAbsent(string key) =>
+        Assert.IsNull(ClassicConfigService.Instance().GetValue(key));
+    [TestMethod]
     [Ignore("Проходит отдельно, но падает после ClassicWritesStateThatCanLeak: глобальное состояние сохраняется между тестами.")]
     public void ClassicExpectedEmptyState() =>
-        Assert.IsNull(ClassicConfigService.Instance().GetValue("order-dependent"));
+        AssertClassicValueIsAbsent("order-dependent");
     [TestMethod]
     public void SeparateContainersHaveSeparateSingletons()
     {
