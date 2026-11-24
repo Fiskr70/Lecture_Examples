@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 if (args.Length != 1)
 {
-    Console.Error.WriteLine("�ᯮ�짮�����: LogHub <���� � 䠩�� �����>");
+    Console.Error.WriteLine("Использование: LogHub <путь к файлу логов>");
     return;
 }
 var settings = Configuration.Load("loghub.config");
@@ -24,11 +24,11 @@ services.AddSingleton<IRecordFormatter>(sp => sp.GetRequiredService<IConfigServi
 services.AddSingleton<ILogSink>(sp => sp.GetRequiredService<IConfigService>().GetValue("sink") switch
 {
     "file" => new ManagedFileSink(), "console" or null => new ManagedConsoleSink(),
-    _ => throw new InvalidOperationException("��������� ��䨫� ��񬭨��")
+    _ => throw new InvalidOperationException("Неизвестный профиль приёмника")
 });
 services.AddTransient<LogProcessor>();
 services.AddTransient<LogApplication>();
 using var container = services.BuildServiceProvider();
 var application = container.GetRequiredService<LogApplication>();
 var result = application.Run(args[0]);
-Console.WriteLine($"����ᠭ�: {result.Written}, �ய�饭�: {result.Skipped}");
+Console.WriteLine($"Записано: {result.Written}, пропущено: {result.Skipped}");

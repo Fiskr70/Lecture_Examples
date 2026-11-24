@@ -1,5 +1,14 @@
 using LogHub;
 
+if (args.Length == 1 && args[0] == "singleton-order")
+{
+    var config = ClassicConfigService.Instance();
+    Console.WriteLine($"Fresh instance is empty: {config.GetValue("order-dependent") is null}");
+    config.SetValue("order-dependent", "present");
+    Console.WriteLine($"After prior test, expected empty: {config.GetValue("order-dependent") is null}");
+    return 0;
+}
+
 var tests = new List<(string Name, Action Check)>
 {
     ("valid line", () => { var r = new PipeLogParser().Parse("2026-01-01| Warning | hello "); Require(r is not null && r.Severity == "Warning" && r.Message == "hello"); }),

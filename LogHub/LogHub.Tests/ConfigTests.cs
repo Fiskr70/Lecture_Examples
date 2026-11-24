@@ -29,7 +29,15 @@ public class ConfigTests
         Assert.AreEqual("present", ClassicConfigService.Instance().GetValue("order-dependent"));
     }
     [TestMethod]
-    [Ignore("��室�� �⤥�쭮, �� ������ ��᫥ ClassicWritesStateThatCanLeak: ������쭮� ���ﭨ� ��࠭���� ����� ��⠬�.")]
+    public void ClassicStateSurvivesBetweenIndependentCallers()
+    {
+        var key = Guid.NewGuid().ToString();
+        Assert.IsNull(ClassicConfigService.Instance().GetValue(key));
+        ClassicConfigService.Instance().SetValue(key, "written");
+        Assert.AreEqual("written", ClassicConfigService.Instance().GetValue(key));
+    }
+    [TestMethod]
+    [Ignore("Проходит отдельно, но падает после ClassicWritesStateThatCanLeak: глобальное состояние сохраняется между тестами.")]
     public void ClassicExpectedEmptyState() =>
         Assert.IsNull(ClassicConfigService.Instance().GetValue("order-dependent"));
     [TestMethod]
