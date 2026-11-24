@@ -1,22 +1,34 @@
 using LogHub;
+using Microsoft.Extensions.DependencyInjection;
 
 if (args.Length != 1)
 {
-    Console.Error.WriteLine("Использование: LogHub <путь к файлу логов>");
+    Console.Error.WriteLine("�ᯮ�짮�����: LogHub <���� � 䠩�� �����>");
     return;
 }
-
-var config = Configuration.Load("loghub.config");
-var formatters = new Dictionary<string, IRecordFormatter>(StringComparer.Ordinal)
+var settings = Configuration.Load("loghub.config");
+var services = new ServiceCollection();
+services.AddSingleton<IConfigService>(_ =>
 {
-    ["plain"] = new PlainFormatter(), ["json"] = new JsonFormatter(), ["csv"] = new CsvFormatter()
-};
-var formatter = formatters.GetValueOrDefault(config["format"], new MessageFormatter());
-ProcessingResult result;
-using (var sink = SinkRegistry.Create(config["sink"], config))
+    var config = new ConfigService();
+    foreach (var (key, value) in settings) config.SetValue(key, value);
+    return config;
+});
+services.AddSingleton<PipeLogParser>();
+services.AddSingleton(sp => new SeverityFilter(sp.GetRequiredService<IConfigService>().GetValue("minSeverity") ?? "Info"));
+services.AddSingleton<IRecordFormatter>(sp => sp.GetRequiredService<IConfigService>().GetValue("format") switch
 {
-    var processor = new LogProcessor(new PipeLogParser(), new SeverityFilter(config["minSeverity"]),
-        formatter, sink);
-    result = processor.Process(File.ReadLines(args[0]));
-}
-Console.WriteLine($"Записано: {result.Written}, пропущено: {result.Skipped}");
+    "json" => new JsonFormatter(), "csv" => new CsvFormatter(),
+    "plain" or null => new PlainFormatter(), _ => new MessageFormatter()
+});
+services.AddSingleton<ILogSink>(sp => sp.GetRequiredService<IConfigService>().GetValue("sink") switch
+{
+    "file" => new ManagedFileSink(), "console" or null => new ManagedConsoleSink(),
+    _ => throw new InvalidOperationException("��������� ��䨫� ��񬭨��")
+});
+services.AddTransient<LogProcessor>();
+services.AddTransient<LogApplication>();
+using var container = services.BuildServiceProvider();
+var application = container.GetRequiredService<LogApplication>();
+var result = application.Run(args[0]);
+Console.WriteLine($"����ᠭ�: {result.Written}, �ய�饭�: {result.Skipped}");
