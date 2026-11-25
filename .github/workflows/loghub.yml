@@ -1,0 +1,17 @@
+name: LogHub build and tests
+on:
+  push:
+    branches: [ main, develop, 'feature/**' ]
+  pull_request:
+    branches: [ main, develop ]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore LogHub/LogHub.sln
+      - run: dotnet build LogHub/LogHub.sln --no-restore --configuration Release --warnaserror
+      - run: dotnet test LogHub/LogHub.sln --no-build --configuration Release --verbosity normal
