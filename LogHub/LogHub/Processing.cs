@@ -22,6 +22,8 @@ public sealed class SeverityFilter(string minimum)
         ["Debug"] = 0, ["Info"] = 1, ["Warning"] = 2, ["Error"] = 3, ["Critical"] = 4
     };
 
+    public SeverityFilter(IConfigService config) : this(config.GetValue("minSeverity") ?? "Info") { }
+
     public bool Allows(LogRecord record) => Level(record.Severity) >= Level(minimum);
     private static int Level(string name) => Levels.GetValueOrDefault(name, 1);
 }
@@ -58,8 +60,11 @@ public interface ILogSink
     void Write(LogRecord record, string formatted);
 }
 
+[SinkName("console")]
 public sealed class ConsoleSink(TextWriter output) : ILogSink
 {
+    public ConsoleSink() : this(Console.Out) { }
+
     public void Write(LogRecord record, string formatted)
     {
         if (!ReferenceEquals(output, Console.Out)) { output.WriteLine(formatted); return; }
@@ -70,15 +75,6 @@ public sealed class ConsoleSink(TextWriter output) : ILogSink
             output.WriteLine(formatted);
         }
         finally { Console.ForegroundColor = previous; }
-    }
-}
-
-public sealed class FileSink(TextWriter output) : ILogSink
-{
-    public void Write(LogRecord record, string formatted)
-    {
-        output.WriteLine(formatted);
-        output.Flush();
     }
 }
 

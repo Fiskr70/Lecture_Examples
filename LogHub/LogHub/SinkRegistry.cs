@@ -2,66 +2,50 @@ using System.Reflection;
 
 namespace LogHub;
 
-public interface IManagedLogSink : ILogSink, IDisposable;
-
-public interface ISinkFactory
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class SinkNameAttribute(string name) : Attribute
 {
-    string Name { get; }
-    IManagedLogSink Create(IReadOnlyDictionary<string, string> settings);
+    public string Name { get; } = name;
 }
 
 public static class SinkRegistry
 {
-    public static IManagedLogSink Create(string name, IReadOnlyDictionary<string, string> settings)
+    private static readonly IReadOnlyDictionary<string, Type> SinkTypes = typeof(SinkRegistry)
+        .Assembly.GetTypes()
+        .Where(type => !type.IsAbstract && typeof(ILogSink).IsAssignableFrom(type))
+        .Select(type => (Type: type, Name: type.GetCustomAttribute<SinkNameAttribute>()))
+        .Where(sink => sink.Name is not null)
+        .ToDictionary(sink => sink.Name!.Name, sink => sink.Type, StringComparer.Ordinal);
+
+    public static Type ResolveType(string name) =>
+        SinkTypes.TryGetValue(name, out var sinkType)
+            ? sinkType
+            : throw new NotSupportedException($"Приёмник '{name}' не поддерживается");
+}
+
+[SinkName("file")]
+public sealed class FileSink : ILogSink, IDisposable
+{
+    private readonly StreamWriter writer = new($"logs-{DateTime.Now:yyyyMMdd}.txt", append: true);
+
+    public void Write(LogRecord record, string formatted)
     {
-        var factories = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(t => !t.IsAbstract && typeof(ISinkFactory).IsAssignableFrom(t))
-            .Select(t => (ISinkFactory)Activator.CreateInstance(t)!)
-            .ToDictionary(f => f.Name, StringComparer.Ordinal);
-        if (!factories.TryGetValue(name, out var factory))
-            throw new NotSupportedException($"Приёмник '{name}' не поддерживается");
-        return factory.Create(settings);
+        writer.WriteLine(formatted);
+        writer.Flush();
     }
+
+    public void Dispose() => writer.Dispose();
 }
 
-public sealed class ConsoleSinkFactory : ISinkFactory
+// Имитирует вывод учебного примера без подключения к базе данных.
+[SinkName("database")]
+public sealed class DemonstrationDatabaseSink : ILogSink, IDisposable
 {
-    public string Name => "console";
-    public IManagedLogSink Create(IReadOnlyDictionary<string, string> settings) => new ManagedConsoleSink();
-}
+    public DemonstrationDatabaseSink(IConfigService config) =>
+        Console.WriteLine($"[БД] соединение открыто: {config.GetValue("connection") ?? "local"}");
 
-public sealed class ManagedConsoleSink : IManagedLogSink
-{
-    private readonly ConsoleSink _sink = new(Console.Out);
-    public void Write(LogRecord record, string formatted) => _sink.Write(record, formatted);
-    public void Dispose() { }
-}
+    public void Write(LogRecord record, string formatted) => Console.WriteLine(
+        $"[БД] INSERT INTO logs(date, severity, message) VALUES(@d, @s, @m) -> {record.Date:O}, {record.Severity}, {formatted}");
 
-public sealed class FileSinkFactory : ISinkFactory
-{
-    public string Name => "file";
-    public IManagedLogSink Create(IReadOnlyDictionary<string, string> settings) => new ManagedFileSink();
-}
-
-public sealed class ManagedFileSink : IManagedLogSink
-{
-    private readonly StreamWriter _writer = new($"logs-{DateTime.Now:yyyyMMdd}.txt", append: true);
-    public void Write(LogRecord record, string formatted) { _writer.WriteLine(formatted); _writer.Flush(); }
-    public void Dispose() => _writer.Dispose();
-}
-
-public sealed class DatabaseSinkFactory : ISinkFactory
-{
-    public string Name => "database";
-    public IManagedLogSink Create(IReadOnlyDictionary<string, string> settings) =>
-        new DemonstrationDatabaseSink(settings.GetValueOrDefault("connection", "local"));
-}
-
-// Имитация сообщений демонстрационного соединения, а не доступ к реальной БД.
-public sealed class DemonstrationDatabaseSink : IManagedLogSink
-{
-    public DemonstrationDatabaseSink(string connection) => Console.WriteLine($"[БД] соединение открыто: {connection}");
-    public void Write(LogRecord r, string text) => Console.WriteLine(
-        $"[БД] INSERT INTO logs(date, severity, message) VALUES(@d, @s, @m) -> {r.Date:O}, {r.Severity}, {text}");
     public void Dispose() => Console.WriteLine("[БД] соединение закрыто");
 }
